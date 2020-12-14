@@ -1,0 +1,39 @@
+@startuml dss
+
+partition main
+    (*) --> SOC_init()
+    -->[create]MmwDemo_dssInitTask()
+    -->BIOS_start()
+    --> return 
+end partition
+
+partition "MmwDemo_dssInitTask"
+    "MmwDemo_dssInitTask()"->Mailbox_init()
+    -->MmwDemo_edmaInit
+    -->MmwDemo_edmaOpen
+    -->DPM_init()
+    -->DPM_synch()
+    -->[until success]DPM_synch()
+    -->[create]MmwDemo_DPC_ObjectDetection_dpmTask()
+end partition
+
+partition "MmwDemo_DPC_ObjectDetection_dpmTask"
+    "MmwDemo_DPC_ObjectDetection_dpmTask()" -> DPM_execute()
+    -->Cycleprofiler_getTimeStamp()
+    -->MmwDemo_updateObjectDetStats()
+    -->MmwDemo_copyResultToHSRAM()
+    -->DPM_sendResult()
+    -->DPM_execute()
+end partition
+
+partition "DPM_execute"
+    "DPM_execute()"->SemaphoreP_pend(ptrDPM->semaphoreHandle, SemaphoreP_WAIT_FOREVER)
+    note right:Pending on the semaphore: Waiting for events to be received
+    -->DPM_msgRecv()
+    -->HwiP_disable()
+    -->HwiP_restore()
+    -->ptrDPM->procChainCfg.executeFxn()
+    note right:确实需要处理DPC
+end partition
+
+@enduml

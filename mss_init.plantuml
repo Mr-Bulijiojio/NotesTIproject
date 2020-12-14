@@ -1,0 +1,124 @@
+@startuml mss
+
+partition main
+    (*) --> ESM_init(0U)
+    --> SOC_init()
+    --> SOC_isSecureDevice()
+    --> [create] MmwDemo_initTask()
+    --> BIOS_start()
+    --> return 
+end partition
+
+partition MmwDemo_initTask
+    "MmwDemo_initTask()" -> UART_init()
+    -->GPIO_init()
+    -->Mailbox_init()
+    -->MmwDemo_LVDSStreamInit()
+    -->MmwDemo_platformInit()
+    -->UART_open()
+    -->Semaphore_Params_init()
+    -->MmwDemo_edmaInit()
+    -->MmwDemo_edmaOpen()
+    -->MmwDemo_hwaInit()
+    -->MmwDemo_hwaOpen()
+
+    partition "mmWave: Initialization of the high level module"
+        -->MMWave_init()
+        -->MMWave_sync()
+    end partition
+    
+    partition "Launch the mmWave control execution task"
+        -->[ceate]MmwDemo_mmWaveCtrlTask()
+    end partition
+
+    partition "Initialization of the DPM Module"
+        -->"DPC Call-back config" 
+        -->DPM_init()
+        -->DPM_synch()
+        -->[until success]DPM_synch()
+        -->[create]mmwDemo_mssDPMTask()
+    end partition
+
+    partition "Initialize the Profiler"
+        -->Cycleprofiler_init()
+        note right: CPU周期分析
+    end partition
+
+    partition "Initialize the CLI Module"
+        -->MmwDemo_CLIInit()
+    end partition
+end partition
+
+    partition "mmwDemo_mssDPMTask"
+        "mmwDemo_mssDPMTask()"->DPM_execute()
+        -->[run forever]DPM_execute()
+    end partition
+    
+    partition "DPM_execute"
+        "DPM_execute()"->SemaphoreP_pend(ptrDPM->semaphoreHandle, SemaphoreP_WAIT_FOREVER)
+        note right:Pending on the semaphore: Waiting for events to be received
+        -->DPM_msgRecv()
+        -->HwiP_disable()
+        -->HwiP_restore()
+        -->ptrDPM->procChainCfg.executeFxn()
+        note right:确实需要处理DPC
+    end partition
+
+    partition "MmwDemo_mmWaveCtrlTask"
+        "MmwDemo_mmWaveCtrlTask()"->MMWave_execute()
+        -->[run forever]MMWave_execute()
+    end partition
+
+    partition "MMWave_execute"
+        "MMWave_execute()"->SemaphoreP_pend(ptrMMWaveMCB->linkSemHandle, SemaphoreP_WAIT_FOREVER)
+        note right:Pending on the semaphore: Waiting for events to be received
+        -->MMWave_executeLink()
+        -->MMWave_deviceExecuteFxn()
+    end partition
+
+    partition "MmwDemo_CLIInit"
+        "MmwDemo_CLIInit()"-->"define CLI_Cfg cliCfg"
+        -->CLI_open()
+    end partition
+
+    partition "CLI_open"
+        "CLI_open()"-->"cliCfg赋值给gCLI"
+        -->"查看cliCfg中支持的指令数目"
+        -->"是否使能mmWave Extension"
+        -->"CLI Prompt是否已经定义"
+        "CLI Prompt是否已经定义"-->[yes:demo]"mmwDemo:/>"
+        "CLI Prompt是否已经定义"-->[no]"CLI:/>"
+        "CLI:/>"--> [create] CLI_task()
+        "mmwDemo:/>"--> [create] CLI_task()
+    end partition
+
+    partition "CLI_task"
+        "CLI_task()"->"show SDK version"
+        -->"show Demo Prompt"
+        -->"cmd是否合法"
+        -->"执行匹配的CLI处理函数ptrCLICommandEntry->cmdHandlerFxn"
+        -->"没有匹配的CLI cmd 是否使能mmWave extension"
+        -->"show Demo Prompt"
+    end partition
+
+@enduml
+
+
+
+
+
+
+
+
+
+
+
+
+
+' [mmwave]:ti\control\mmwave\src\mmwave.c
+
+' [mmwave]
+
+
+
+' <span id="CLI_task"></span>

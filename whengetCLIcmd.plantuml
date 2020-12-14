@@ -1,0 +1,142 @@
+@startuml  profileCfgCLIcommond
+    title profileCfg CLI commond received by UART
+
+        (*)->"cli commond profileCfg" 
+
+    partition "CLI_task"
+        --> UART_read()
+        --> "没有匹配到registered CLI commands"
+        --> CLI_MMWaveExtensionHandler()
+    end partition
+
+    partition CLI_MMWaveExtensionHandler
+        "CLI_MMWaveExtensionHandler()"-->cmd匹配到CLI_CmdTableEntry中的成员变量"profileCfg"
+        -->"ptrCLICommandEntry->cmdHandlerFxn (argc, argv)"
+        -->[which is]CLI_MMWaveProfileCfg()
+    end partition
+
+    partition CLI_MMWaveProfileCfg
+        "CLI_MMWaveProfileCfg()"->"检查参数个数"
+        -->检查参数个数
+        -->"Initialize the profile configuration"
+        -->"Populate the profile configuration"
+        -->"profileHandle = MMWave_addProfile()"
+        -->"Record the profile
+            ptrBaseCfgProfileHandle[index] = profileHandle"
+    end partition
+
+@enduml
+
+
+@startuml  cfarCfgCLIcommond
+    title cfarCfg CLI commond received by UART
+
+        (*)->"cli commond cfarCfg" 
+
+    partition "CLI_task"
+        --> UART_read()
+        --> "匹配到registered CLI commands"
+        --> ptrCLICommandEntry->cmdHandlerFxn()
+        -->[which is]MmwDemo_CLICfarCfg()
+    end partition
+
+    partition MmwDemo_CLICfarCfg
+        "MmwDemo_CLICfarCfg()"->MmwDemo_CLIGetSubframe()
+        -->[No]MmwDemo_CfgUpdate()
+        note right
+            传入参数
+            (void *)&cfarCfg, MMWDEMO_CFARCFGRANGE_OFFSET,sizeof(cfarCfg), subFrameNum
+            其中的MMWDEMO_CFARCFGRANGE_OFFSET或MMWDEMO_CFARCFGDOPPLER_OFFSET
+            由(MMWDEMO_SUBFRAME_DSPDYNCFG_OFFSET + \offsetof(DPC_ObjectDetection_DynCfg, cfarCfgRange))定义
+        end note
+    end partition
+
+    partition MmwDemo_CfgUpdate
+        "MmwDemo_CfgUpdate()"-->memcpy((void *)((uint32_t) &gMmwMssMCB.subFrameCfg[subFrameNum] + offset), srcPtr, size)
+
+        note right
+            "MmwDemo_MSS_MCB
+            中包含成员变量MmwDemo_SubFrameCfg         subFrameCfg[RL_MAX_SUBFRAMES]
+            ====
+            而MmwDemo_SubFrameCfg
+            中包含成员变量MmwDemo_DPC_ObjDet_DynCfg objDetDynCfg
+            ====
+            而MmwDemo_DPC_ObjDet_DynCfg
+            中包含成员变量DPC_ObjectDetection_DynCfg      dspDynCfg
+            ====
+            而DPC_ObjectDetection_DynCfg
+            中包含成员变量
+                DPU_CFARCAProc_CfarCfg cfarCfgRange
+                DPU_CFARCAProc_CfarCfg cfarCfgDoppler
+                DPU_CFARCAProc_FovCfg fovRange
+                DPU_CFARCAProc_FovCfg fovDoppler
+                DPU_AoAProc_MultiObjBeamFormingCfg multiObjBeamFormingCfg;
+                bool  prepareRangeAzimuthHeatMap;
+                DPU_AoAProc_FovAoaCfg fovAoaCfg;
+                DPU_AoAProc_ExtendedMaxVelocityCfg extMaxVelCfg;
+                DPC_ObjectDetection_StaticClutterRemovalCfg_Base staticClutterRemovalCfg
+            "
+        end note
+
+        -->MmwDemo_setSubFramePendingState()
+
+@enduml
+
+@startuml sensorStartCfgCLIcommond
+ 
+
+    (*)->"cli commond sensorStart"
+
+    partition "CLI_task"
+        --> UART_read()
+        --> "匹配到registered CLI commands"
+        --> ptrCLICommandEntry->cmdHandlerFxn()
+        -->[which is]MmwDemo_CLISensorStart()
+    end partition
+
+    partition "MmwDemo_CLISensorStart"
+        "MmwDemo_CLISensorStart()" --> 判断是否doReconfig
+        "判断是否doReconfig"-->["sensorStart"] "doReconfig = true"
+        "判断是否doReconfig"-->["sensorStart 0"] "doReconfig = false"
+
+        "doReconfig = false"-->CLI_getMMWaveExtensionConfig()
+        "doReconfig = true"-->[MmwDemo_SensorState_INIT||MmwDemo_SensorState_OPENED]CLI_getMMWaveExtensionConfig()
+        -->MmwDemo_RFParser_getNumSubFrames()
+        -->MmwDemo_isAllCfgInPendingState()
+        if "AllCfgInPendingState" then
+            ->[No] Error: Full configuration must be provided before sensor can be started
+        else 
+            if "gMmwMssMCB.sensorState ==MmwDemo_SensorState_STARTED" then
+                ->[Yes] Ignored: Sensor is already started
+            else
+
+            endif
+        endif
+
+        -->"检查CfgPendingState是否满足不同doReconfig下的配置要求"
+        if "gMmwMssMCB.sensorState ==MmwDemo_SensorState_INIT" 
+            ->[no]"
+            通过CLI_getMMWaveExtensionOpenConfig()
+            检查chCfg, 
+            lowPowerMode, 
+            adcCfg是否更改
+            如果更改必须reboot"
+
+        else
+            -->[yes]CLI_getMMWaveExtensionOpenConfig()
+            -->"MmwDemo_openSensor()
+                ====
+                gMmwMssMCB.sensorState= 
+                MmwDemo_SensorState_OPENED"
+        endif
+
+        if "doReconfig" 
+            ->[true]CLI_getMMWaveExtensionConfig
+            -->MmwDemo_configSensor()
+            -->MmwDemo_startSensor()
+        else
+            -->MmwDemo_startSensor()
+        endif
+        -->"gMmwMssMCB.sensorState = MmwDemo_SensorState_STARTED"
+    end partition
+@enduml
