@@ -166,8 +166,15 @@
 
     partition MmwDemo_dataPathConfig
         "MmwDemo_dataPathConfig()"-->SOC_getDeviceRFFreqScaleFactor()
-        -->MmwDemo_RFParser_getNumSubFrames()
+        -->MmwDemo_RFParser_getNumSubFrames*()
         -->DPM_ioctl()
-        
+        -->MmwDemo_DPM_ioctl_blocking()
+        -->MmwDemo_resetDynObjDetCommonCfgPendingState()
+        -->MmwDemo_RFParser_parseConfig()
+        -->MmwDemo_ADCBufConfig()
+        -->MmwDemo_configCQ()
+        -->MmwDemo_DPM_ioctl_blocking*()
+        -->MmwDemo_DPM_ioctl_blocking**()
+        -->MmwDemo_resetDynObjDetCfgPendingState()
     end partition
 @enduml
