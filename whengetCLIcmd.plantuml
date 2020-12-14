@@ -83,8 +83,6 @@
 @enduml
 
 @startuml sensorStartCfgCLIcommond
- 
-
     (*)->"cli commond sensorStart"
 
     partition "CLI_task"
@@ -99,21 +97,27 @@
         "判断是否doReconfig"-->["sensorStart"] "doReconfig = true"
         "判断是否doReconfig"-->["sensorStart 0"] "doReconfig = false"
 
-        "doReconfig = false"-->CLI_getMMWaveExtensionConfig()
-        "doReconfig = true"-->[MmwDemo_SensorState_INIT||MmwDemo_SensorState_OPENED]CLI_getMMWaveExtensionConfig()
+        "doReconfig = false"-->==S1==
+        "doReconfig = true"-->==S1==
+
+        ==S1== -->[MmwDemo_SensorState_INIT||MmwDemo_SensorState_OPENED]CLI_getMMWaveExtensionConfig()
         -->MmwDemo_RFParser_getNumSubFrames()
         -->MmwDemo_isAllCfgInPendingState()
         if "AllCfgInPendingState" then
             ->[No] Error: Full configuration must be provided before sensor can be started
         else 
-            if "gMmwMssMCB.sensorState ==MmwDemo_SensorState_STARTED" then
-                ->[Yes] Ignored: Sensor is already started
-            else
+            -->==S2==
+        endif
 
-            endif
+        if "gMmwMssMCB.sensorState ==MmwDemo_SensorState_STARTED" then
+            ->[Yes] Ignored: Sensor is already started
+        else
+            -->==S3==
         endif
 
         -->"检查CfgPendingState是否满足不同doReconfig下的配置要求"
+
+        --> ==S4==
         
         if "gMmwMssMCB.sensorState ==MmwDemo_SensorState_INIT" 
             ->[no]"
@@ -130,9 +134,10 @@
                 gMmwMssMCB.sensorState= 
                 MmwDemo_SensorState_OPENED" as A2
         endif
-        
-        A1 -->(*)
-        A2 -->(*)
+
+        A1 -->==S5==
+        A2 -->==S5==
+
         if "doReconfig" 
             ->[true]CLI_getMMWaveExtensionConfig
             -->MmwDemo_configSensor()
@@ -141,5 +146,28 @@
             -->MmwDemo_startSensor()
         endif
         -->"gMmwMssMCB.sensorState = MmwDemo_SensorState_STARTED"
+
+        ==S1== --> ==S2==
+    end partition
+
+    partition MmwDemo_openSensor
+        A2 --> [isFirstTimeOpen]rlRfSetLdoBypassConfig()
+        --> 赋值gMmwMssMCB.cfg.openCfg
+        --> MMWave_open()
+        --> MmwDemo_mssSetHsiClk()
+        --> MmwDemo_dataPathOpen()
+    end partition
+
+    partition MmwDemo_configSensor
+        "MmwDemo_configSensor()"-->MmwDemo_bpmConfig()
+        -->MMWave_config()
+        -->[MMWave_config Success]MmwDemo_dataPathConfig()
+    end partition
+
+    partition MmwDemo_dataPathConfig
+        "MmwDemo_dataPathConfig()"-->SOC_getDeviceRFFreqScaleFactor()
+        -->MmwDemo_RFParser_getNumSubFrames()
+        -->DPM_ioctl()
+        
     end partition
 @enduml
