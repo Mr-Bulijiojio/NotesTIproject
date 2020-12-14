@@ -114,22 +114,25 @@
         endif
 
         -->"检查CfgPendingState是否满足不同doReconfig下的配置要求"
+        
         if "gMmwMssMCB.sensorState ==MmwDemo_SensorState_INIT" 
             ->[no]"
             通过CLI_getMMWaveExtensionOpenConfig()
             检查chCfg, 
             lowPowerMode, 
             adcCfg是否更改
-            如果更改必须reboot"
+            如果更改必须reboot" as A1
 
         else
             -->[yes]CLI_getMMWaveExtensionOpenConfig()
             -->"MmwDemo_openSensor()
                 ====
                 gMmwMssMCB.sensorState= 
-                MmwDemo_SensorState_OPENED"
+                MmwDemo_SensorState_OPENED" as A2
         endif
-
+        
+        A1 -->(*)
+        A2 -->(*)
         if "doReconfig" 
             ->[true]CLI_getMMWaveExtensionConfig
             -->MmwDemo_configSensor()
