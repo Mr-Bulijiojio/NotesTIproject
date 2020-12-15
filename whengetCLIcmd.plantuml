@@ -5,21 +5,21 @@
 
     partition "CLI_task"
         --> UART_read()
-        --> "没有匹配到registered CLI commands"
+        --> "没有匹配到registered CLI commands" #CCFFFF
         --> CLI_MMWaveExtensionHandler()
     end partition
 
     partition CLI_MMWaveExtensionHandler
-        "CLI_MMWaveExtensionHandler()"-->cmd匹配到CLI_CmdTableEntry中的成员变量"profileCfg"
+        "CLI_MMWaveExtensionHandler()"-->cmd匹配到CLI_CmdTableEntry中的成员变量"profileCfg" #CCFFFF
         -->"ptrCLICommandEntry->cmdHandlerFxn (argc, argv)"
         -->[which is]CLI_MMWaveProfileCfg()
     end partition
 
     partition CLI_MMWaveProfileCfg
-        "CLI_MMWaveProfileCfg()"->"检查参数个数"
+        "CLI_MMWaveProfileCfg()"->"检查参数个数" #CCFFFF
         -->检查参数个数
-        -->"Initialize the profile configuration"
-        -->"Populate the profile configuration"
+        -->"Initialize the profile configuration" #CCFFFF
+        -->"Populate the profile configuration" #CCFFFF
         -->"profileHandle = MMWave_addProfile()"
         -->"Record the profile
             ptrBaseCfgProfileHandle[index] = profileHandle"
@@ -35,7 +35,7 @@
 
     partition "CLI_task"
         --> UART_read()
-        --> "匹配到registered CLI commands"
+        --> "匹配到registered CLI commands" #CCFFFF
         --> ptrCLICommandEntry->cmdHandlerFxn()
         -->[which is]MmwDemo_CLICfarCfg()
     end partition
@@ -83,19 +83,19 @@
 @enduml
 
 @startuml sensorStartCfgCLIcommond
-    (*)->"cli commond sensorStart"
+    (*)->"cli commond sensorStart" #CCFFFF
 
     partition "CLI_task"
         --> UART_read()
-        --> "匹配到registered CLI commands"
+        --> "匹配到registered CLI commands" #CCFFFF
         --> ptrCLICommandEntry->cmdHandlerFxn()
         -->[which is]MmwDemo_CLISensorStart()
     end partition
 
     partition "MmwDemo_CLISensorStart"
-        "MmwDemo_CLISensorStart()" --> 判断是否doReconfig
-        "判断是否doReconfig"-->["sensorStart"] "doReconfig = true"
-        "判断是否doReconfig"-->["sensorStart 0"] "doReconfig = false"
+        "MmwDemo_CLISensorStart()" --> 判断是否doReconfig #CCFFFF
+        "判断是否doReconfig"-->["sensorStart"] "doReconfig = true" #CCFFFF
+        "判断是否doReconfig"-->["sensorStart 0"] "doReconfig = false" #CCFFFF
 
         "doReconfig = false"-->==S1==
         "doReconfig = true"-->==S1==
@@ -104,18 +104,18 @@
         -->MmwDemo_RFParser_getNumSubFrames()
         -->MmwDemo_isAllCfgInPendingState()
         if "AllCfgInPendingState" then
-            ->[No] Error: Full configuration must be provided before sensor can be started
+            ->[No] Error: Full configuration must be provided before sensor can be started #CCFFFF
         else 
             -->==S2==
         endif
 
         if "gMmwMssMCB.sensorState ==MmwDemo_SensorState_STARTED" then
-            ->[Yes] Ignored: Sensor is already started
+            ->[Yes] Ignored: Sensor is already started #CCFFFF
         else
             -->==S3==
         endif
 
-        -->"检查CfgPendingState是否满足不同doReconfig下的配置要求"
+        -->"检查CfgPendingState是否满足不同doReconfig下的配置要求" #CCFFFF
 
         --> ==S4==
         
@@ -125,7 +125,7 @@
             检查chCfg, 
             lowPowerMode, 
             adcCfg是否更改
-            如果更改必须reboot" as A1
+            如果更改必须reboot" as A1 #CCFFFF
 
         else
             -->[yes]CLI_getMMWaveExtensionOpenConfig()
@@ -139,7 +139,7 @@
         A2 -->==S5==
 
         if "doReconfig" 
-            ->[true]CLI_getMMWaveExtensionConfig
+            ->[true]CLI_getMMWaveExtensionConfig*()
             -->MmwDemo_configSensor()
             -->MmwDemo_startSensor()
         else
@@ -152,7 +152,7 @@
 
     partition MmwDemo_openSensor
         A2 --> [isFirstTimeOpen]rlRfSetLdoBypassConfig()
-        --> 赋值gMmwMssMCB.cfg.openCfg
+        --> "赋值gMmwMssMCB.cfg.openCfg" #CCFFFF
         --> MMWave_open()
         --> MmwDemo_mssSetHsiClk()
         --> MmwDemo_dataPathOpen()
@@ -165,16 +165,87 @@
     end partition
 
     partition MmwDemo_dataPathConfig
-        "MmwDemo_dataPathConfig()"-->SOC_getDeviceRFFreqScaleFactor()
+        "MmwDemo_dataPathConfig()"-->"Get data path object and control configuration" #CCFFFF
+        -->SOC_getDeviceRFFreqScaleFactor()
         -->MmwDemo_RFParser_getNumSubFrames*()
-        -->DPM_ioctl()
-        -->MmwDemo_DPM_ioctl_blocking()
-        -->MmwDemo_resetDynObjDetCommonCfgPendingState()
-        -->MmwDemo_RFParser_parseConfig()
-        -->MmwDemo_ADCBufConfig()
-        -->MmwDemo_configCQ()
-        -->MmwDemo_DPM_ioctl_blocking*()
-        -->MmwDemo_DPM_ioctl_blocking**()
-        -->MmwDemo_resetDynObjDetCfgPendingState()
+
+        partition "DPC pre-start common config"
+
+            -->"DPM_ioctl()
+            ----
+            DPC_OBJDET_IOCTL__STATIC_PRE_START_COMMON_CFG" as temp
+
+            note right
+                给DPC发送预开始常规配置 preStartCommonCfg
+                ----
+                这个函数用来配置IPC
+                ====
+                eg.uint8_t numSubFrames;
+                DPC_ObjectDetection_MeasureRxChannelBiasCfg measureRxChannelBiasCfg;
+                DPU_AoAProc_compRxChannelBiasCfg compRxChanCfg;
+                ANTDEF_AntGeometry antDef;
+            end note
+
+            -->MmwDemo_DPM_ioctl_blocking()
+            -->MmwDemo_resetDynObjDetCommonCfgPendingState()
+
+        end partition
+
+        partition Config
+            -->[reveaser loop] ==S6==
+            --> "get a subFrameCfg
+            ----
+            subFrameCfg  = &gMmwMssMCB.subFrameCfg[subFrameIndx]" #CCFFFF
+            -->MmwDemo_RFParser_parseConfig()
+            -->MmwDemo_ADCBufConfig()
+            -->MmwDemo_configCQ()
+
+            note right
+                MmwDemo_configCQ()用于配置
+                Chirp Quality监视的监视器
+            end note
+
+            partition "DPC pre-start config"
+                -->配置objDetPreStartR4fCfg.staticCfg #CCFFFF
+                -->"MmwDemo_DPM_ioctl_blocking
+                (DPC_OBJDETRANGEHWA_IOCTL__STATIC_PRE_START_CFG)"
+                -->"Reset preStart config 
+                ----
+                DPC configuration 
+                ----
+                Convert CFAR threshold value 
+                ----
+                memory information configuration" #CCFFFF
+
+                -->"MmwDemo_DPM_ioctl_blocking
+                (DPC_OBJDET_IOCTL__STATIC_PRE_START_CFG)"
+                -->MmwDemo_resetDynObjDetCfgPendingState()
+
+                note right
+                    配置完成,清除已有的配置
+                end note
+
+                --> ==S6== 
+            end partition
+
+        end partition
+        ==S6== ->[遍历所有subFrameCfg] (*)
     end partition
+
+    
+
+    partition DPM_ioctl
+        temp-->DPM_msgInitHeader()
+
+        note right
+            message的头部初始化
+        end note
+
+        -->[message的成员变量初始化]DPM_pipeSend()
+
+        note right
+            将message通过IPC发送给DSS端
+        end note
+    end partition
+
 @enduml

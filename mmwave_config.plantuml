@@ -1,0 +1,29 @@
+@startuml mmw_config
+
+    partition mmw_config
+        (*)->"MmwDemo_configSensor"
+        --> mmw_config(配置导出API)
+        --> MMWave_configLink()
+        --> "Determine the DFE Output mode"
+        "Determine the DFE Output mode"-->["frame,advanced frame"] "MMWave_configureProfileChirp()"
+        "Determine the DFE Output mode"-->["continuous"] "rlSetContModeConfig()"
+        "MMWave_configureProfileChirp()"-->MMWave_configBPM()
+        --> Set frame configuration
+        --> MMWave_deviceCfgFxn(SOC specific config)
+    end partition
+
+
+    partition MMWave_configureProfileChirp
+        "MMWave_configureProfileChirp()"-->for index<MMWAVE_MAX_PROFILE
+        -->MMWave_getProfileCfg()
+        -->rlSetProfileConfig()(use mmwave link API)
+        -->MMWave_getNumChirps()
+        -->for chirpIndex <= numChirps
+        -->MMWave_getChirpHandle()
+        -->MMWave_getChirpCfg
+        -->rlSetChirpConfig
+    end partition
+
+@enduml
+
+
