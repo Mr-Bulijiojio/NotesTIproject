@@ -158,6 +158,10 @@
         --> MmwDemo_dataPathOpen()
     end partition
 
+@enduml
+
+@startuml MmwDemo_configSensor
+
     partition MmwDemo_configSensor
         "MmwDemo_configSensor()"-->MmwDemo_bpmConfig()
         -->MMWave_config()
@@ -199,7 +203,7 @@
             -->MmwDemo_RFParser_parseConfig()
             -->MmwDemo_ADCBufConfig()
             -->MmwDemo_configCQ()
-
+            
             note right
                 MmwDemo_configCQ()用于配置
                 Chirp Quality监视的监视器
@@ -232,8 +236,6 @@
         ==S6== ->[遍历所有subFrameCfg] (*)
     end partition
 
-    
-
     partition DPM_ioctl
         temp-->DPM_msgInitHeader()
 
@@ -248,4 +250,41 @@
         end note
     end partition
 
+@enduml
+
+@startuml MmwDemo_startSensor
+
+    partition "MmwDemo_startSensor"
+        (*)-->MmwDemo_dataPathStart()
+        "MmwDemo_dataPathStart()"-->MMWave_start()
+        -->GPIO_write()
+
+        note left
+            亮灯儿
+        end note
+    end partition
+
+    partition "MmwDemo_dataPathStart"
+        "MmwDemo_dataPathStart()" -> MmwDemo_configLVDSHwData()
+        --> DPM_start()
+        --> Semaphore_pend()
+    end partition
+
+    partition "DPM_start"
+        "DPM_start()" --> DPM_msgInitHeader()
+
+        note right
+            DPM cmd : 
+                DPM_MessageId_START
+        end note
+
+        --> DPM_pipeSend()
+    end partition
+
+    partition "MMWave_start"
+        "MMWave_start()"--> Sanity Check #CCFFFF
+        --> MMWave_deviceStartFxn()
+        --> MMWave_startLink()
+        --> ptrMMWaveMCB->status = ptrMMWaveMCB->status | MMWAVE_STATUS_STARTED
+    end partition
 @enduml
