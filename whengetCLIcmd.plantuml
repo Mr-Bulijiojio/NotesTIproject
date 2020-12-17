@@ -27,7 +27,6 @@
 
 @enduml
 
-
 @startuml  cfarCfgCLIcommond
     title cfarCfg CLI commond received by UART
 
@@ -267,7 +266,9 @@
     partition "MmwDemo_dataPathStart"
         "MmwDemo_dataPathStart()" -> MmwDemo_configLVDSHwData()
         --> DPM_start()
-        --> Semaphore_pend()
+        --> "Semaphore_pend()
+        ----
+        gMmwMssMCB.DPMstartSemHandle, BIOS_WAIT_FOREVER"
     end partition
 
     partition "DPM_start"

@@ -1,0 +1,69 @@
+@startuml DSSgetDPMstart
+    partition MSS
+        partition DPM_start
+            (*)--> DPM_msgInitHeader()
+
+            note right
+                DPM cmd : 
+                    DPM_MessageId_START
+            end note
+
+            --> DPM_pipeSend()
+        end partition
+    end partition
+
+    partition DPM_pipeSend
+        "DPM_pipeSend()" -->"SemaphoreP_post()
+            ---- 
+            ptrDPM->semaphoreHandle" as A1
+    end partition
+
+    partition DSS
+        partition DPM_execute
+            A1-->"SemaphoreP_pend()
+            ---- 
+            ptrDPM->semaphoreHandle"
+
+            -->"DPM_msgRecv()
+            ----
+            ptrDPM, &errCode" as A2
+            ' -->"ptrDPM->procChainCfg.executeFxn()
+            ' ----
+            ' which is DPC_ObjectDetection_execute()" as A4
+        end partition
+
+        partition DPM_msgRecv
+            A2 --> DPM_pipeRecv()
+            -->"gDPMMessageFxnTable[fxnTableIndex]()
+            ====
+            which is DPM_msgStartHandler" as A3
+            --> DPM_msgPostProcess()
+        end partition
+
+        partition DPM_msgStartHandler
+            A3 -->"ptrDPM->procChainCfg.startFxn()
+            ====
+            which is DPC_ObjectDetection_start()"
+            -->"DPM_msgInitHeader()
+            ----
+            DPM_MessageId_RESPONSE"
+            -->"DPM_msgInitResponse()
+            ----
+            DPM_MessageId_START"
+        end partition
+
+        partition DPM_msgPostProcess
+            "DPM_msgPostProcess()"-->[DPM_Domain_DISTRIBUTED]==S1==
+
+            ==S1==-->[to local]"DPM_pipeSend()
+            ----
+            ptrDPM, ptrResponseMsg, errCode" as A5
+            ==S1==-->[to remote]"ptrDPM->ptrDomainFxnTable->msgSend()"
+            -->DPM_mboxMsgSend()
+        end partition
+
+
+    end partition
+
+
+@enduml
