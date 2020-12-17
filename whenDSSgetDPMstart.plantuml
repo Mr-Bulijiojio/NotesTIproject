@@ -10,6 +10,22 @@
 
             --> DPM_pipeSend()
         end partition
+
+        "DPM_mboxRemoteMailboxCallbackFxn()"-->DPM_pipeSend()**
+
+        partition "DPM_execute MSS"
+            "DPM_pipeSend()**"-->"接收并且执行DPM_msgResponseHandler()" #CCFFFF
+            -->"MmwDemo_DPC_ObjectDetection_reportFxn()
+            ----
+            DPM_Report_DPC_STARTED" as A9
+        end partition
+
+        partition "MmwDemo_DPC_ObjectDetection_reportFxn MSS"
+            A9--> MmwDemo_DPC_ObjectDetection_reportFxn()*
+            -->switch (reportType)
+            -->[DPM_Report_DPC_STARTED]Semaphore_post(gMmwMssMCB.DPMstartSemHandle)
+        end partition
+        ' Mailbox_write()
     end partition
 
     partition DPM_pipeSend
@@ -27,9 +43,18 @@
             -->"DPM_msgRecv()
             ----
             ptrDPM, &errCode" as A2
-            ' -->"ptrDPM->procChainCfg.executeFxn()
-            ' ----
-            ' which is DPC_ObjectDetection_execute()" as A4
+
+            if "responsible for the processing chain"
+                -->[not under this situation] "key = HwiP_disable();
+                executeDPC         = ptrDPM->executeDPC;
+                ptrDPM->executeDPC = false;
+                HwiP_restore(key);"
+                --> "ptrDPM->procChainCfg.executeFxn()
+                ----
+                which is DPC_ObjectDetection_execute()" as A4
+            else 
+                --> return
+            endif
         end partition
 
         partition DPM_msgRecv
@@ -58,10 +83,63 @@
             ==S1==-->[to local]"DPM_pipeSend()
             ----
             ptrDPM, ptrResponseMsg, errCode" as A5
-            ==S1==-->[to remote]"ptrDPM->ptrDomainFxnTable->msgSend()"
+
+            note right
+                告诉local PDM:DPC已经STARTED 
+            end note
+
+            ==S1==->[to remote]"ptrDPM->ptrDomainFxnTable->msgSend()"
+
+            note right
+                告诉remote PDM:DPC已经STARTED 
+            end note
+
             -->DPM_mboxMsgSend()
+            ->"DPM_mboxRemoteMailboxCallbackFxn()"
         end partition
 
+            A5 -->"SemaphoreP_post()
+            ---- 
+            ptrDPM->semaphoreHandle" as A6
+
+        partition "DPM_execute Next Turn"
+            A6 --> SemaphoreP不进行阻塞 #CCFFFF
+            -->"DPM_msgRecv()*
+            ----
+            ptrDPM, &errCode" as A7
+            -->return*
+        end partition
+
+        "return*"-->"下次再进入DPM_execute()会被信号量阻塞,
+        直至得到来自DFE的DPM_frameStartISR()"
+
+        partition "DPM_msgRecv Next Turn"
+            A7-->DPM_pipeRecv()*
+            --> "gDPMMessageFxnTable[fxnTableIndex]()
+            ====
+            which is DPM_msgResponseHandler" as A8
+            -->DPM_msgPostProcess()*
+        end partition
+
+        partition "DPM_msgResponseHandler"
+            A8 --> "switch ptrMessage->u.responseMsg.requestMsgId"
+            --> [DPM_MessageId_START] "ptrDPM->procChainStatus = ptrDPM->procChainStatus | DPM_PROC_CHAIN_STATUS_STARTED"
+            --> "ptrDPM->initCfg.reportFxn()
+            ----
+            DPM_Report_DPC_STARTED
+            "
+            --> [which is]"MmwDemo_DPC_ObjectDetection_reportFxn()"
+        end partition
+
+        partition "MmwDemo_DPC_ObjectDetection_reportFxn"
+            "MmwDemo_DPC_ObjectDetection_reportFxn()"-->reportType
+            -->[DPM_Report_DPC_STARTED]gMmwDssMCB.dpmStartEvents++
+        end partition
+
+        partition "DPM_msgPostProcess Next Turn"
+            "DPM_msgPostProcess()*"-->[DPM_Domain_DISTRIBUTED]==S2==
+            --> do nothing #CCFFFF
+        end partition
 
     end partition
 

@@ -89,6 +89,7 @@
         --> "匹配到registered CLI commands" #CCFFFF
         --> ptrCLICommandEntry->cmdHandlerFxn()
         -->[which is]MmwDemo_CLISensorStart()
+        -->CLI_write(\"Done\n\")
     end partition
 
     partition "MmwDemo_CLISensorStart"
@@ -268,7 +269,17 @@
         --> DPM_start()
         --> "Semaphore_pend()
         ----
-        gMmwMssMCB.DPMstartSemHandle, BIOS_WAIT_FOREVER"
+        gMmwMssMCB.DPMstartSemHandle, BIOS_WAIT_FOREVER" 
+        
+        note left
+            一直
+            等待
+            直到
+            start
+            信号量
+            释放
+        end note
+
     end partition
 
     partition "DPM_start"
