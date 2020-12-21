@@ -1,0 +1,69 @@
+@startuml event
+    (*)-->BSS
+    -->"DPM_frameStartISR()
+    ----
+    ptrDPM->procChainCfg.frameStartFxn (ptrDPM->dpcHandle)" as A1
+
+    partition frame event
+        partition dsp_framestart
+            A1-->DPC_ObjectDetection_frameStart()(dsp)
+        end partition
+
+        partition rangeHWA
+            A1-->DPC_ObjectDetection_frameStart()(rangeHWA)
+            -->"DPM_notifyExecute()
+            ----
+            ptrDPM->executeDPC = true
+            ----
+            ptrDPM->dpcHandle=0"        
+            -->SemaphoreP_post 
+            -->"DPM_execute()
+            ----
+            ptrDPM->dpcHandle != NULL"
+            -->ptrDPM->procChainCfg.executeFxn (ptrDPM->dpcHandle, ptrResult)
+            -->DPC_ObjectDetection_execute()(rangehwa)
+            -->"DPU_RangeProcHWA_process()"
+            -->"DPM_relayResult()
+            ----
+            ptrDPM->ptrDomainFxnTable->sendResult" as A2
+        end partition
+
+    end partition
+
+
+    partition rangehwa_process
+        "DPU_RangeProcHWA_process()"-->[分配内存存储内部数据]wait for the all paramSets done interrupt #CCFFFF
+        --> "<img:/figure/1.png>"
+    end partition
+
+    partition dsp_process
+        A2-->["sendResult用于传递buffers"]DPM_mboxSendResult()
+        -->[MSS to DSS]"DSS端DPM收到信息并处理" #CCFFFF
+        -->DPM_mboxRemoteMailboxCallbackFxn()
+        -->DPM_pipeSend()
+        -->SemaphoreP_post*()
+        -->DPM_execute()
+        -->"DPM_msgRecv()
+        ----
+        gDPMMessageFxnTable[fxnTableIndex] (ptrDPM, &rxMsg, &respMsg, errCode)"
+        -->DPM_msgResultHandler()
+        -->DPC_ObjectDetection_dataInjection()
+        -->DPM_notifyExecute*()
+        -->DPC_ObjectDetection_execute()
+
+        partition "DPC_ObjectDetection_execute"
+            -->"(*processCallBack->processInterFrameBeginCallBackFxn)(objDetObj->subFrameIndx)
+            ----
+            which is MmwDemo_DPC_ObjectDetection_processInterFrameBeginCallBackFxn() 
+            it get CPUload by Load_update();Load_getCPULoad();
+            "
+            -->Cycleprofiler_getTimeStamp()
+            -->DPU_DopplerProcDSP_process()
+            -->DPC_ObjDetDSP_rangeBiasRxChPhaseMeasure()
+            -->DPU_CFARCAProcDSP_process()
+            -->DPU_AoAProcDSP_process()
+            -->result->compRxChanBiasMeasurement = &objDetObj->compRxChanCfgMeasureOut
+        end partition
+    end partition
+
+@enduml

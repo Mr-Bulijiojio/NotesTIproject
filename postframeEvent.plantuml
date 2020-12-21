@@ -1,0 +1,70 @@
+@startuml postframeEvent
+    partition DSS
+        (*)--> DPC_ObjectDetection_execute() is done #CCFFFF
+        -->return DPM_execute() #CCFFFF
+        -->return to MmwDemo_DPC_ObjectDetection_dpmTask() #CCFFFF
+        partition "MmwDemo_DPC_ObjectDetection_dpmTask"
+            -->Cycleprofiler_getTimeStamp()
+            -->MmwDemo_updateObjectDetStats()
+            --> MmwDemo_copyResultToHSRAM()
+            -->DPM_sendResult()
+
+            note right
+                call DPM_mboxSendResult()
+                call DPM_mboxMsgSend()
+                ----
+                DPM_MessageId_RESULT
+            end note
+        end partition 
+
+        ==S1== --> DPM_msgRecv()*
+        -->"retVal = gDPMMessageFxnTable[fxnTableIndex] (ptrDPM, &rxMsg, &respMsg, errCode)
+        ----
+        which is DPM_msgDPCCfgHandler()"
+        -->"ptrDPM->procChainCfg.ioctlFxn()
+        ----
+        which is DPC_ObjectDetection_ioctl()"
+        --> [DPC_OBJDET_IOCTL__DYNAMIC_EXECUTE_RESULT_EXPORTED]DPC_ObjDetDSP_reconfigSubFrame()
+    end partition
+
+    partition MSS
+        partition DPM_execute()
+            "DPM_sendResult()"-->DPM_msgRecv()
+        end partition
+
+        note left
+            then it calls
+            ptrDPM->initCfg.reportFxn(DPM_Report_NOTIFY_DPC_RESULT...)
+            MmwDemo_DPC_ObjectDetection_reportFxn()
+            MmwDemo_handleObjectDetResult()
+        end note
+
+        partition MmwDemo_handleObjectDetResult
+            "DPM_msgRecv()"-->MmwDemo_handleObjectDetResult()
+            --> read result from HSRAM #CCFFFF
+            --> [if used H/W or S/W LVDS]transfer data via LVDS #CCFFFF
+            -->MmwDemo_transmitProcessedOutput()
+
+            note left
+                Transmit processing results for the frame via UART
+            end note 
+
+            --> MmwDemo_getNextSubFrameIndx()
+            --> MmwDemo_processPendingDynamicCfgCommands()
+
+            note left
+                Dynamic Configeration
+            end note
+
+            --> MmwDemo_ADCBufConfig()
+            -->"DPM_ioctl()
+            ----
+            DPM_MessageId_DPC_CFG
+            DPC_OBJDET_IOCTL__DYNAMIC_EXECUTE_RESULT_EXPORTED" 
+            --> ==S1==
+
+        end partition
+
+    end partition
+    
+@enduml
